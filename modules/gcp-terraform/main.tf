@@ -24,11 +24,11 @@ locals {
   tags = {
     "environment" = [
       { "prod" : (data.google_project.prod_project.number) },
-      # { "dev" : (data.google_project.dev_project.number) },
+      { "dev" : (data.google_project.dev_project.number) },
     ],
     "system-id" = [
       { "tototus" : (data.google_project.prod_project.number) },
-      # { "tototus" : (data.google_project.dev_project.number) },
+      { "tototus" : (data.google_project.dev_project.number) },
     ]
   }
 }
@@ -62,7 +62,7 @@ resource "google_tags_tag_value" "value" {
 }
 
 # Create Tags Binding
-resource "google_tags_location_tag_binding" "binding" {
+resource "google_tags_tag_binding" "binding" {
   for_each  = { for idx, record in local.helper_list : idx => record }
   parent    = "//cloudresourcemanager.googleapis.com/projects/${each.value.project_number}"
   tag_value = "tagValues/${google_tags_tag_value.value[each.key].name}"
