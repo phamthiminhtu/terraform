@@ -1,33 +1,31 @@
-provider "google" {
-  credentials = file("credentials/terraform-417520-b244cdfcb327.json")
-  project = "terraform-417520"
-  region = "australia-southeast1"
-}
+# provider "google" {
+#   credentials = file("credentials/terraform-417520-b244cdfcb327.json")
+#   project = "terraform-417520"
+#   region = "australia-southeast1"
+# }
 
 provider "google" {
-  credentials = file("credentials/kafka-408805-03c2c1a6eb65.json")
-  alias  = "kafka"
+  credentials = file("credentials/kafka-408805-a71c410a3bb6.json")
   project = "kafka-408805"
-  region = "australia-southeast1"
 }
 
 data "google_project" "dev_project" {
-  provider = google.kafka
+  # provider = google.kafka
 }
 
-data "google_project" "prod_project" {
-  provider = google
-}
+# data "google_project" "prod_project" {
+#   provider = google
+# }
 
 
 locals {
   tags = {
     "environment" = [
-      { "prod" : (data.google_project.prod_project.number) },
+      # { "prod" : (data.google_project.prod_project.number) },
       { "dev" : (data.google_project.dev_project.number) },
     ],
     "system-id" = [
-      { "tototus" : (data.google_project.prod_project.number) },
+      # { "tototus" : (data.google_project.prod_project.number) },
       { "tototus" : (data.google_project.dev_project.number) },
     ]
   }
