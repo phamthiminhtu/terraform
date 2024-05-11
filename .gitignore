@@ -1,3 +1,5 @@
 *.terraform*
 *.tfstate
 *.tfstate.*
+credentials/*
+**/.DS_Store
