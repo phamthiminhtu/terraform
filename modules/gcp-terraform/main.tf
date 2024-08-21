@@ -1,67 +1,38 @@
-# provider "google" {
-#   credentials = file("credentials/terraform-417520-b244cdfcb327.json")
-#   project = "terraform-417520"
-#   region = "australia-southeast1"
+# resource "google_project" "projects" {
+#   for_each = var.gcp_projects_info
+#   name       = each.value.project_name
+#   project_id = each.key  # Must be globally unique
+#   lifecycle {
+#     prevent_destroy = false
+#   }
 # }
 
-provider "google" {
-  credentials = file("credentials/kafka-408805-a71c410a3bb6.json")
-  project = "kafka-408805"
+resource "google_service_account" "service_accounts" {
+  for_each = var.gcp_projects_info
+  provider = google
+  account_id   = each.value.service_account_id
+  display_name = "Service Account for ${each.key}"
+  project      = each.key
 }
 
-data "google_project" "dev_project" {
-  # provider = google.kafka
+resource "google_project_iam_member" "unified_data_pipeline_service_accounts_roles" {
+  for_each = var.gcp_projects_info
+  role   = "roles/editor"
+  project = each.key 
+  member = "serviceAccount:${google_service_account.service_accounts[each.key].email}"
 }
 
-# data "google_project" "prod_project" {
-#   provider = google
-# }
+resource "google_storage_bucket" "iceberg_buckets" {
+  for_each = var.gcp_projects_info
+  project = each.key
+  name          = each.value.iceberg_bucket_name # Must be globally unique
+  location      = var.gcs_bucket_location
+  force_destroy = true
 
-
-locals {
-  tags = {
-    "environment" = [
-      # { "prod" : (data.google_project.prod_project.number) },
-      { "dev" : (data.google_project.dev_project.number) },
-    ],
-    "system-id" = [
-      # { "tototus" : (data.google_project.prod_project.number) },
-      { "tototus" : (data.google_project.dev_project.number) },
-    ]
+  versioning {
+    enabled = true
   }
-}
-
-locals {
-  helper_list = flatten([
-    for tag_short_name, values in local.tags : [
-      for value in values : [
-        for tag_value, project_number in value : {
-          "tag_short_name" = tag_short_name
-          "tag_value"      = tag_value
-          "project_number" = project_number
-    }]]
-  ])
-}
-
-
-resource "google_tags_tag_key" "key" {
-  for_each    = { for idx, record in local.helper_list : idx => record }
-  parent      = "projects/${each.value.project_number}"
-  short_name  = each.value.tag_short_name
-  description = "For ${each.value.tag_short_name} resources."
-}
-
-# Create Tags Values for Key
-resource "google_tags_tag_value" "value" {
-  for_each    = { for idx, record in local.helper_list : idx => record }
-  parent      = "tagKeys/${google_tags_tag_key.key[each.key].name}"
-  short_name  = each.value.tag_value
-  description = each.value.tag_value
-}
-
-# Create Tags Binding
-resource "google_tags_tag_binding" "binding" {
-  for_each  = { for idx, record in local.helper_list : idx => record }
-  parent    = "//cloudresourcemanager.googleapis.com/projects/${each.value.project_number}"
-  tag_value = "tagValues/${google_tags_tag_value.value[each.key].name}"
+  lifecycle {
+    prevent_destroy = false
+  }
 }
