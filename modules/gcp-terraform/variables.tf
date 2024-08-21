@@ -1,9 +1,9 @@
-variable "gcp_project_id" {
+variable gcp_projects_info {
+  type = map
+}
+variable gcp_project_region {
   type = string
 }
-variable "gcp_project_name" {
-  type = string
-}
-variable "gcp_project_region" {
+variable gcs_bucket_location {
   type = string
 }
