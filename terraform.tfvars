@@ -15,4 +15,6 @@ gcp_projects_info = {
 gcp_project_region = "asia-southeast1-a"
 gcs_bucket_location = "ASIA-SOUTHEAST1"
 gcp_credentials_file_path = "/Users/tototus/.config/gcloud/application_default_credentials.json"
+gcp_dev_project_id = "unified-pipeline-dev-20240820"
+gcp_prod_project_id = "unified-pipeline-prod-20240820"
 

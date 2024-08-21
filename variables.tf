@@ -1,6 +1,12 @@
 variable gcp_projects_info {
   type = map
 }
+variable gcp_dev_project_id {
+  type = string
+}
+variable gcp_prod_project_id {
+  type = string
+}
 variable gcp_credentials_file_path {
   type = string
 }

@@ -36,3 +36,55 @@ resource "google_storage_bucket" "iceberg_buckets" {
     prevent_destroy = false
   }
 }
+
+resource "google_service_account" "doris_vm_dev_sa" {
+  project = var.gcp_dev_project_id
+  account_id   = "doris-vm-dev-sa"
+  display_name = "Custom SA for Dev Doris VM Instance"
+}
+
+resource "google_compute_instance" "doris_vm_dev" {
+  name         = "doris-dev"
+  machine_type = "e2-micro"
+  zone         = var.gcp_project_region
+  project      = var.gcp_dev_project_id
+  tags = ["doris-dev"]
+
+  scheduling {
+    provisioning_model = "SPOT"
+    preemptible = "true"
+    automatic_restart = "false"
+    max_run_duration {
+      seconds = 604800 # 7 days
+    }
+  }
+
+  boot_disk {
+    initialize_params {
+      image = "debian-cloud/debian-11"
+      labels = {
+        env = "dev"
+      }
+    }
+  }
+
+  network_interface {
+    network = "default"
+
+    access_config {
+      // Ephemeral public IP
+    }
+  }
+
+  metadata = {
+    foo = "bar"
+  }
+
+  metadata_startup_script = "echo hi > /test.txt"
+
+  service_account {
+    # Google recommends custom service accounts that have cloud-platform scope and permissions granted via IAM Roles.
+    email  = google_service_account.doris_vm_dev_sa.email
+    scopes = ["cloud-platform"]
+  }
+}

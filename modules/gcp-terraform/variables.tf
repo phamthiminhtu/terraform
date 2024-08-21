@@ -7,3 +7,9 @@ variable gcp_project_region {
 variable gcs_bucket_location {
   type = string
 }
+variable gcp_dev_project_id {
+  type = string
+}
+variable gcp_prod_project_id {
+  type = string
+}
