@@ -45,7 +45,7 @@ resource "google_service_account" "doris_vm_dev_sa" {
 
 resource "google_compute_instance" "doris_vm_dev" {
   name         = "doris-dev"
-  machine_type = "e2-micro"
+  machine_type = "e2-medium"
   zone         = var.gcp_project_region
   project      = var.gcp_dev_project_id
   tags = ["doris-dev"]
@@ -81,7 +81,7 @@ resource "google_compute_instance" "doris_vm_dev" {
     foo = "bar"
     ssh-keys = var.gcp_compute_engine_ssh_pub_key
   }
-
+  allow_stopping_for_update = true
   metadata_startup_script = "echo hi > /test.txt"
 
   service_account {
