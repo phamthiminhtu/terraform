@@ -16,3 +16,6 @@ variable gcp_project_region {
 variable gcs_bucket_location {
   type = string
 }
+variable gcp_compute_engine_ssh_pub_key {
+  type = string
+}

@@ -54,6 +54,7 @@ resource "google_compute_instance" "doris_vm_dev" {
     provisioning_model = "SPOT"
     preemptible = "true"
     automatic_restart = "false"
+    instance_termination_action = "STOP"
     max_run_duration {
       seconds = 604800 # 7 days
     }
@@ -78,6 +79,7 @@ resource "google_compute_instance" "doris_vm_dev" {
 
   metadata = {
     foo = "bar"
+    ssh-keys = var.gcp_compute_engine_ssh_pub_key
   }
 
   metadata_startup_script = "echo hi > /test.txt"

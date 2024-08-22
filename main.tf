@@ -9,4 +9,5 @@ module "gcp-terraform" {
   gcs_bucket_location=var.gcs_bucket_location
   gcp_dev_project_id=var.gcp_dev_project_id
   gcp_prod_project_id=var.gcp_prod_project_id
+  gcp_compute_engine_ssh_pub_key=var.gcp_compute_engine_ssh_pub_key
 }

@@ -13,3 +13,6 @@ variable gcp_dev_project_id {
 variable gcp_prod_project_id {
   type = string
 }
+variable gcp_compute_engine_ssh_pub_key {
+  type = string
+}
