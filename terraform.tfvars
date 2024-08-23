@@ -10,6 +10,7 @@ gcp_projects_info = {
         service_account_id = "unified-data-pipeline-dev-sa",
         service_account_name = "Unified Data Pipeline Dev Service Account"
         iceberg_bucket_name = "iceberg-dev-20240820"
+        vm_name = "doris-dev"
     }
 }
 gcp_project_region = "asia-southeast1-a"

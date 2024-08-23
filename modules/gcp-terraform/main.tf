@@ -44,11 +44,11 @@ resource "google_service_account" "doris_vm_dev_sa" {
 }
 
 resource "google_compute_instance" "doris_vm_dev" {
-  name         = "doris-dev"
+  name         = var.gcp_projects_info[var.gcp_dev_project_id].vm_name
   machine_type = "e2-medium"
   zone         = var.gcp_project_region
   project      = var.gcp_dev_project_id
-  tags = ["doris-dev"]
+  tags = [var.gcp_projects_info[var.gcp_dev_project_id].vm_name]
 
   scheduling {
     provisioning_model = "SPOT"
@@ -89,4 +89,12 @@ resource "google_compute_instance" "doris_vm_dev" {
     email  = google_service_account.doris_vm_dev_sa.email
     scopes = ["cloud-platform"]
   }
+}
+
+resource "google_compute_disk" "doris-dev" {
+  project = var.gcp_dev_project_id
+  name = var.gcp_projects_info[var.gcp_dev_project_id].vm_name
+  type = "pd-standard"
+  zone = var.gcp_project_region
+  size = "100"
 }
