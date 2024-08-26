@@ -91,3 +91,12 @@ resource "google_compute_instance" "doris_vm_dev" {
     scopes = ["cloud-platform"]
   }
 }
+
+
+resource "google_project_iam_custom_role" "custom-delegate" {
+  project     = var.gcp_dev_project_id
+  role_id     = "CustomDelegate"
+  title       = "Iceberg BQ Delegate"
+  description = "Iceberg BQ Delegate"
+  permissions = ["bigquery.connections.delegate"]
+}
