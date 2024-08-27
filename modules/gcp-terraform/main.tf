@@ -59,36 +59,61 @@ resource "google_storage_bucket" "iceberg_buckets" {
   }
 }
 
+# Grant access
+
 locals {
-  iceberg_catalog_buckets  = [for bucket in local.flattened_iceberg_buckets["${var.gcp_dev_project_id}"] : bucket if can(regex("catalog", bucket))]
-  iceberg_storage_buckets  = [for bucket in local.flattened_iceberg_buckets["${var.gcp_dev_project_id}"] : bucket if can(regex("storage", bucket))]
-  gcs_catalog_bucket_roles = toset(["roles/storage.objectAdmin"])
-  gcs_catalog_bucket_bindings = [
-    for iceberg_catalog_bucket in toset(local.iceberg_catalog_buckets) : [
-      for gcs_catalog_bucket_role in local.gcs_catalog_bucket_roles :
-      {
-        account_id = google_bigquery_connection.bigspark_connection.spark[0].service_account_id
-        bucket     = iceberg_catalog_bucket
-        role       = gcs_catalog_bucket_role
-      }
-    ]
+  iceberg_catalog_bucket = [for bucket in local.flattened_iceberg_buckets["${var.gcp_dev_project_id}"] : bucket if can(regex("catalog", bucket))][0]
+  iceberg_storage_bucket = [for bucket in local.flattened_iceberg_buckets["${var.gcp_dev_project_id}"] : bucket if can(regex("storage", bucket))][0]
+  gcs_bucket_bindings = [
+    {
+      account_id = google_bigquery_connection.bigspark_connection.spark[0].service_account_id
+      bucket     = local.iceberg_catalog_bucket
+      role       = "roles/storage.objectAdmin"
+    },
+    {
+      account_id = google_bigquery_connection.bigspark_connection.spark[0].service_account_id
+      bucket     = local.iceberg_storage_bucket
+      role       = "roles/storage.objectViewer"
+    }
   ]
-  gcs_storage_bucket_roles = toset(["roles/storage.objectViewer"])
-  gcs_storage_bucket_bindings = [
-    for iceberg_storage_bucket in toset(local.iceberg_storage_buckets) : [
-      for gcs_storage_bucket_role in local.gcs_storage_bucket_roles :
-      {
-        account_id = google_bigquery_connection.bigspark_connection.spark[0].service_account_id
-        bucket     = iceberg_storage_bucket
-        role       = gcs_storage_bucket_role
-      }
-    ]
+  bigquery_dataset_bindings = [
+    {
+      dataset_id = "taxi_dataset"
+      role       = "roles/bigquery.dataOwner"
+      members = [
+        "serviceAccount:${google_bigquery_connection.bigspark_connection.spark[0].service_account_id}",
+      ]
+    }
   ]
-  gcs_bindings = toset(setunion(flatten(local.gcs_catalog_bucket_bindings), flatten(local.gcs_storage_bucket_bindings)))
+  all_bigquery_dataset_bindings = [
+    for binding in local.bigquery_dataset_bindings :
+    {
+      project    = var.gcp_dev_project_id # only have spark connection on dev for now
+      dataset_id = binding.dataset_id
+      role       = binding.role
+      members    = binding.members
+    }
+  ]
+  project_bindings = [
+    {
+      project = var.gcp_dev_project_id
+      role    = "roles/biglake.admin"
+      members = [
+        "serviceAccount:${google_bigquery_connection.bigspark_connection.spark[0].service_account_id}",
+      ]
+    },
+    {
+      project = var.gcp_dev_project_id
+      role    = "roles/bigquery.user"
+      members = [
+        "serviceAccount:${google_bigquery_connection.bigspark_connection.spark[0].service_account_id}",
+      ]
+    }
+  ]
 }
 
 resource "google_storage_bucket_iam_binding" "bucket_permissions" {
-  for_each = { for binding in local.gcs_bindings : "${binding.bucket}-${binding.role}" => binding }
+  for_each = { for binding in local.gcs_bucket_bindings : "${binding.bucket}-${binding.role}" => binding }
   bucket   = each.value.bucket
   role     = each.value.role
 
@@ -97,6 +122,20 @@ resource "google_storage_bucket_iam_binding" "bucket_permissions" {
   ]
 }
 
+resource "google_bigquery_dataset_iam_binding" "bigquery_dataset_bindings" {
+  for_each   = { for binding in local.all_bigquery_dataset_bindings : "${binding.project}-${binding.dataset_id}-${binding.role}" => binding }
+  project    = each.value.project
+  dataset_id = each.value.dataset_id
+  role       = each.value.role
+  members    = each.value.members
+}
+
+resource "google_project_iam_binding" "project_roles" {
+  for_each = { for binding in local.project_bindings : "${binding.project}-${binding.role}" => binding }
+  project  = each.value.project
+  role     = each.value.role
+  members  = each.value.members
+}
 
 # resource "google_service_account" "iceberg_sa" {
 #   for_each     = local.iceberg_gcs_map
@@ -160,7 +199,7 @@ resource "google_compute_instance" "doris_vm_dev" {
   }
 }
 
-resource "google_project_iam_custom_role" "custom-delegate" {
+resource "google_project_iam_custom_role" "custom-delegates" {
   project     = var.gcp_dev_project_id
   role_id     = "CustomDelegate"
   title       = "Iceberg BQ Delegate"
