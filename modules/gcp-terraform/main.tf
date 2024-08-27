@@ -8,25 +8,51 @@
 # }
 
 resource "google_service_account" "service_accounts" {
-  for_each = var.gcp_projects_info
-  provider = google
+  for_each     = var.gcp_projects_info
+  provider     = google
   account_id   = each.value.service_account_id
   display_name = "Service Account for ${each.key}"
   project      = each.key
 }
 
 resource "google_project_iam_member" "unified_data_pipeline_service_accounts_roles" {
-  for_each = var.gcp_projects_info
-  role   = "roles/editor"
-  project = each.key 
-  member = "serviceAccount:${google_service_account.service_accounts[each.key].email}"
+  for_each     = var.gcp_projects_info
+  role         = "roles/editor"
+  project      = each.key 
+  member       = "serviceAccount:${google_service_account.service_accounts[each.key].email}"
+}
+
+locals {
+  flattened_iceberg_buckets = {
+    for project_id, value in var.gcp_projects_info : project_id => lookup(value, "iceberg_bucket_names", null)
+  }
+}
+
+locals {
+  iceberg_gcs = flatten(
+    [for project_id, value in local.flattened_iceberg_buckets:
+      flatten(
+        [for iceberg_bucket_name in value: 
+          {
+            "project_id" = project_id
+            "iceberg_bucket_name" = iceberg_bucket_name
+          }
+        ])
+    ])
+}
+
+locals {
+  iceberg_gcs_map = zipmap(
+    [for i in range(length(local.iceberg_gcs)) : i],
+    local.iceberg_gcs
+  )
 }
 
 resource "google_storage_bucket" "iceberg_buckets" {
-  for_each = var.gcp_projects_info
-  project = each.key
+  for_each      = local.iceberg_gcs_map
+  project       = each.value.project_id
   name          = each.value.iceberg_bucket_name # Must be globally unique
-  location      = var.gcs_bucket_location
+  location      = var.gcp_project_location
   force_destroy = true
 
   versioning {
@@ -37,8 +63,15 @@ resource "google_storage_bucket" "iceberg_buckets" {
   }
 }
 
+resource "google_service_account" "iceberg_sa" {
+  for_each     = local.iceberg_gcs_map
+  project      = each.value.project_id
+  account_id   = "${each.value.iceberg_bucket_name}-sa"
+  display_name = "Custom SA for Iceberg bucket ${each.value.iceberg_bucket_name}"
+}
+
 resource "google_service_account" "doris_vm_dev_sa" {
-  project = var.gcp_dev_project_id
+  project      = var.gcp_dev_project_id
   account_id   = "doris-vm-dev-sa"
   display_name = "Custom SA for Dev Doris VM Instance"
 }
@@ -92,11 +125,103 @@ resource "google_compute_instance" "doris_vm_dev" {
   }
 }
 
-
 resource "google_project_iam_custom_role" "custom-delegate" {
   project     = var.gcp_dev_project_id
   role_id     = "CustomDelegate"
   title       = "Iceberg BQ Delegate"
   description = "Iceberg BQ Delegate"
   permissions = ["bigquery.connections.delegate"]
+}
+
+locals {
+  flattened_bigquery_datasets = {
+    for project_id, value in var.gcp_projects_info : project_id => lookup(value, "bigquery_datasets", null)
+  }
+}
+
+locals {
+  bigquery_datasets = flatten(
+    [for project_id, value in local.flattened_bigquery_datasets:
+      flatten(
+        [for dataset_id, dataset_info in value: 
+          {
+            "project_id" = project_id
+            "dataset_id" = dataset_id
+            "friendly_name" = dataset_info.friendly_name
+          }
+        ])
+    ])
+}
+
+locals {
+  bigquery_dataset_map = zipmap(
+    [for i in range(length(local.bigquery_datasets)) : i],
+    local.bigquery_datasets
+  )
+}
+
+resource "google_bigquery_dataset" "datasets" {
+  for_each          = local.bigquery_dataset_map
+  project           = each.value.project_id
+  dataset_id        = each.value.dataset_id
+  friendly_name     = each.value.friendly_name
+  location          = var.gcp_project_location
+  labels = {
+    env = "dev"
+  }
+
+  # access {
+  #   role          = "OWNER"
+  #   user_by_email = google_service_account.bqowner.email
+  # }
+
+  # access {
+  #   role   = "READER"
+  #   domain = "hashicorp.com"
+  # }
+}
+
+# Only create for dev project for now
+resource "google_bigquery_connection" "bigspark_connection" {
+  project      = var.gcp_dev_project_id
+  connection_id = "bigspark-connection"
+  location      = var.gcp_project_location
+  spark {
+    spark_history_server_config {
+        dataproc_cluster = google_dataproc_cluster.dataproc_bigspark.id
+    }
+  }
+}
+
+resource "google_dataproc_cluster" "dataproc_bigspark" {
+  project = var.gcp_dev_project_id
+  name   = "bigspark-connection"
+  region = var.gcp_project_location
+
+  cluster_config {
+    # Keep the costs down with smallest config we can get away with
+    gce_cluster_config {
+      zone = var.gcp_project_region
+    }
+    software_config {
+      override_properties = {
+        "dataproc:dataproc.allow.zero.workers" = "true"
+      }
+    }
+
+    master_config {
+      num_instances = 1
+      machine_type  = "e2-standard-2"
+      disk_config {
+        boot_disk_size_gb = 35
+      }
+    }
+  }   
+ }
+
+resource "google_bigquery_connection" "biglake_connection" {
+  project = var.gcp_dev_project_id
+  connection_id = "biglake-connection"
+  location   = var.gcp_project_location
+  cloud_resource {}
 }
