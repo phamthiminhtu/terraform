@@ -57,19 +57,26 @@ locals {
   iceberg_storage_bucket = [for bucket in local.flattened_iceberg_buckets["${var.gcp_dev_project_id}"] : bucket if can(regex("storage", bucket))][0]
   gcs_bucket_bindings = [
     {
-      account_id = google_bigquery_connection.bigspark_connection.spark[0].service_account_id
-      bucket     = local.iceberg_catalog_bucket
-      role       = "roles/storage.objectAdmin"
+      bucket = local.iceberg_storage_bucket
+      role   = "roles/storage.objectViewer"
+      members = [
+        "serviceAccount:${google_bigquery_connection.bigspark_connection.spark[0].service_account_id}"
+      ]
     },
     {
-      account_id = google_bigquery_connection.bigspark_connection.spark[0].service_account_id
-      bucket     = local.iceberg_storage_bucket
-      role       = "roles/storage.objectViewer"
+      bucket = local.iceberg_catalog_bucket
+      role   = "roles/storage.objectAdmin"
+      members = [
+        "serviceAccount:${google_bigquery_connection.biglake_connection.cloud_resource[0].service_account_id}"
+      ]
     },
     {
-      account_id = google_bigquery_connection.biglake_connection.cloud_resource[0].service_account_id
-      bucket     = local.iceberg_storage_bucket
-      role       = "roles/storage.objectAdmin"
+      bucket = local.iceberg_storage_bucket
+      role   = "roles/storage.objectAdmin"
+      members = [
+        "serviceAccount:${google_bigquery_connection.biglake_connection.cloud_resource[0].service_account_id}",
+        "serviceAccount:${google_bigquery_connection.bigspark_connection.spark[0].service_account_id}"
+      ]
     }
   ]
   bigquery_dataset_bindings = [
@@ -114,10 +121,7 @@ resource "google_storage_bucket_iam_binding" "bucket_permissions" {
   for_each = { for binding in local.gcs_bucket_bindings : "${binding.bucket}-${binding.role}" => binding }
   bucket   = each.value.bucket
   role     = each.value.role
-
-  members = [
-    "serviceAccount:${each.value.account_id}"
-  ]
+  members  = each.value.members
 }
 
 resource "google_bigquery_dataset_iam_binding" "bigquery_dataset_bindings" {
@@ -236,37 +240,7 @@ resource "google_bigquery_connection" "bigspark_connection" {
   project       = var.gcp_dev_project_id
   connection_id = "bigspark-connection"
   location      = var.gcp_project_location
-  spark {
-    spark_history_server_config {
-      dataproc_cluster = google_dataproc_cluster.dataproc_bigspark.id
-    }
-  }
-}
-
-resource "google_dataproc_cluster" "dataproc_bigspark" {
-  project = var.gcp_dev_project_id
-  name    = "bigspark-connection"
-  region  = var.gcp_project_location
-
-  cluster_config {
-    # Keep the costs down with smallest config we can get away with
-    gce_cluster_config {
-      zone = var.gcp_project_region
-    }
-    software_config {
-      override_properties = {
-        "dataproc:dataproc.allow.zero.workers" = "true"
-      }
-    }
-
-    master_config {
-      num_instances = 1
-      machine_type  = "e2-standard-2"
-      disk_config {
-        boot_disk_size_gb = 35
-      }
-    }
-  }
+  spark {}
 }
 
 resource "google_bigquery_connection" "biglake_connection" {
