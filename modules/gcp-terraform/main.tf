@@ -57,24 +57,26 @@ locals {
   iceberg_storage_bucket = [for bucket in local.flattened_iceberg_buckets["${var.gcp_dev_project_id}"] : bucket if can(regex("storage", bucket))][0]
   gcs_bucket_bindings = [
     {
-      account_id = google_bigquery_connection.bigspark_connection.spark[0].service_account_id
-      bucket     = local.iceberg_catalog_bucket
-      role       = "roles/storage.objectAdmin"
+      bucket = local.iceberg_storage_bucket
+      role   = "roles/storage.objectViewer"
+      members = [
+        "serviceAccount:${google_bigquery_connection.bigspark_connection.spark[0].service_account_id}"
+      ]
     },
     {
-      account_id = google_bigquery_connection.bigspark_connection.spark[0].service_account_id
-      bucket     = local.iceberg_storage_bucket
-      role       = "roles/storage.objectViewer"
+      bucket = local.iceberg_catalog_bucket
+      role   = "roles/storage.objectAdmin"
+      members = [
+        "serviceAccount:${google_bigquery_connection.biglake_connection.cloud_resource[0].service_account_id}"
+      ]
     },
     {
-      account_id = google_bigquery_connection.biglake_connection.cloud_resource[0].service_account_id
-      bucket     = local.iceberg_catalog_bucket
-      role       = "roles/storage.objectAdmin"
-    },
-    {
-      account_id = google_bigquery_connection.biglake_connection.cloud_resource[0].service_account_id
-      bucket     = local.iceberg_storage_bucket
-      role       = "roles/storage.objectAdmin"
+      bucket = local.iceberg_storage_bucket
+      role   = "roles/storage.objectAdmin"
+      members = [
+        "serviceAccount:${google_bigquery_connection.biglake_connection.cloud_resource[0].service_account_id}",
+        "serviceAccount:${google_bigquery_connection.bigspark_connection.spark[0].service_account_id}"
+      ]
     }
   ]
   bigquery_dataset_bindings = [
@@ -116,13 +118,10 @@ locals {
 }
 
 resource "google_storage_bucket_iam_binding" "bucket_permissions" {
-  for_each = { for binding in local.gcs_bucket_bindings : "${binding.bucket}-${binding.role}-${binding.account_id}" => binding }
+  for_each = { for binding in local.gcs_bucket_bindings : "${binding.bucket}-${binding.role}" => binding }
   bucket   = each.value.bucket
   role     = each.value.role
-
-  members = [
-    "serviceAccount:${each.value.account_id}"
-  ]
+  members  = each.value.members
 }
 
 resource "google_bigquery_dataset_iam_binding" "bigquery_dataset_bindings" {
