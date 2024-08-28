@@ -10,8 +10,6 @@ This repo is to centralize the code that I used to create Cloud resources (at th
 │   └── gcp-terraform
 │       ├── main.tf
 │       └── variables.tf
-├── terraform.tfstate
-├── terraform.tfstate.backup
 ├── terraform.tfvars
 └── variables.tf
 ```
