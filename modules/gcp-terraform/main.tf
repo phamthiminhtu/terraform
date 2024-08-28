@@ -1,12 +1,3 @@
-# resource "google_project" "projects" {
-#   for_each = var.gcp_projects_info
-#   name       = each.value.project_name
-#   project_id = each.key  # Must be globally unique
-#   lifecycle {
-#     prevent_destroy = false
-#   }
-# }
-
 resource "google_service_account" "service_accounts" {
   for_each     = var.gcp_projects_info
   provider     = google
@@ -144,12 +135,6 @@ resource "google_project_iam_binding" "project_roles" {
   members  = each.value.members
 }
 
-# resource "google_service_account" "iceberg_sa" {
-#   for_each     = local.iceberg_gcs_map
-#   project      = each.value.project_id
-#   account_id   = "${each.value.iceberg_bucket_name}-sa"
-#   display_name = "Custom SA for Iceberg bucket ${each.value.iceberg_bucket_name}"
-# }
 
 resource "google_service_account" "doris_vm_dev_sa" {
   project      = var.gcp_dev_project_id
