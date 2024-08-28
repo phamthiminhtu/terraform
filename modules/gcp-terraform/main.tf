@@ -59,7 +59,7 @@ resource "google_storage_bucket" "iceberg_buckets" {
   }
 }
 
-# Grant access
+# Grant permissions
 
 locals {
   iceberg_catalog_bucket = [for bucket in local.flattened_iceberg_buckets["${var.gcp_dev_project_id}"] : bucket if can(regex("catalog", bucket))][0]
@@ -74,6 +74,11 @@ locals {
       account_id = google_bigquery_connection.bigspark_connection.spark[0].service_account_id
       bucket     = local.iceberg_storage_bucket
       role       = "roles/storage.objectViewer"
+    },
+    {
+      account_id = google_bigquery_connection.biglake_connection.cloud_resource[0].service_account_id
+      bucket     = local.iceberg_storage_bucket
+      role       = "roles/storage.objectAdmin"
     }
   ]
   bigquery_dataset_bindings = [
@@ -82,6 +87,7 @@ locals {
       role       = "roles/bigquery.dataOwner"
       members = [
         "serviceAccount:${google_bigquery_connection.bigspark_connection.spark[0].service_account_id}",
+        "serviceAccount:${google_bigquery_connection.biglake_connection.cloud_resource[0].service_account_id}",
       ]
     }
   ]
@@ -100,6 +106,7 @@ locals {
       role    = "roles/biglake.admin"
       members = [
         "serviceAccount:${google_bigquery_connection.bigspark_connection.spark[0].service_account_id}",
+        "serviceAccount:${google_bigquery_connection.biglake_connection.cloud_resource[0].service_account_id}",
       ]
     },
     {
@@ -237,16 +244,6 @@ resource "google_bigquery_dataset" "datasets" {
   labels = {
     env = "dev"
   }
-
-  # access {
-  #   role          = "OWNER"
-  #   user_by_email = google_service_account.bqowner.email
-  # }
-
-  # access {
-  #   role   = "READER"
-  #   domain = "hashicorp.com"
-  # }
 }
 
 # Only create for dev project for now
