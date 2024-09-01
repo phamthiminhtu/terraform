@@ -1,3 +1,10 @@
+terraform {
+  backend "gcs" {
+    bucket  = "tf-state-dev-20240831"
+    prefix  = "terraform/state"
+  }
+}
+
 provider "google" {
   credentials = file(var.gcp_credentials_file_path)
 }
