@@ -24,9 +24,7 @@ jobs:
       run:
         shell: bash
 
-    steps:
-    - name: Init (migrate state)
-      run: terraform init -reconfigure
+    steps: 
       
     - name: Checkout
       uses: 'actions/checkout@v4'
@@ -37,6 +35,9 @@ jobs:
         workload_identity_provider: '${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}'
         service_account: '${{ secrets.GCP_SERVICE_ACCOUNT_TERRAFORM }}'
 
+    - name: Terraform Init (migrate state)
+      run: terraform init -reconfigure
+      
     - name: Terraform Plan
       run: terraform plan -input=false
 
