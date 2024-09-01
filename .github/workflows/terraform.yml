@@ -32,8 +32,11 @@ jobs:
     - name: Auth GCP
       uses: 'google-github-actions/auth@v2'
       with:
-        workload_identity_provider: '${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}'
-        service_account: '${{ secrets.GCP_SERVICE_ACCOUNT_TERRAFORM }}'
+        credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+      # The limitation of workload_identity_provider is it only accepts the service account created **within** the project
+      # which does not allow `terraform apply` for different projects (for different environments)
+        # workload_identity_provider: '${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}'
+        # service_account: '${{ secrets.GCP_SERVICE_ACCOUNT_TERRAFORM }}'
 
     - name: Terraform Init (migrate state)
       run: terraform init -reconfigure
