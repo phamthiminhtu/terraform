@@ -25,6 +25,9 @@ jobs:
         shell: bash
 
     steps:
+    - name: Init (migrate state)
+      run: terraform init -migrate-state
+      
     - name: Checkout
       uses: 'actions/checkout@v4'
       
