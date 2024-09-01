@@ -48,5 +48,5 @@ jobs:
 
     - name: Terraform Apply
       # ref https://stackoverflow.com/questions/60710209/trigger-github-actions-only-when-pr-is-merged
-      if: github.event.pull_request.merged
+      if: github.event.pull_request.merged == true
       run: terraform apply -auto-approve -input=false
