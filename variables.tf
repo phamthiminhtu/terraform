@@ -7,9 +7,6 @@ variable gcp_dev_project_id {
 variable gcp_prod_project_id {
   type = string
 }
-variable gcp_credentials_file_path {
-  type = string
-}
 variable gcp_project_region {
   type = string
 }
