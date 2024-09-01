@@ -5,9 +5,7 @@ terraform {
   }
 }
 
-provider "google" {
-  credentials = file(var.gcp_credentials_file_path)
-}
+provider "google" {}
 
 module "gcp-terraform" {
   source = "./modules/gcp-terraform"
