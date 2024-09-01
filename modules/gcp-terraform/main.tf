@@ -53,29 +53,53 @@ resource "google_storage_bucket" "iceberg_buckets" {
 # Grant permissions
 
 locals {
-  iceberg_catalog_bucket = [for bucket in local.flattened_iceberg_buckets["${var.gcp_dev_project_id}"] : bucket if can(regex("catalog", bucket))][0]
-  iceberg_storage_bucket = [for bucket in local.flattened_iceberg_buckets["${var.gcp_dev_project_id}"] : bucket if can(regex("storage", bucket))][0]
+  iceberg_dev_catalog_bucket = [for bucket in local.flattened_iceberg_buckets["${var.gcp_dev_project_id}"] : bucket if can(regex("catalog", bucket))][0]
+  iceberg_dev_storage_bucket = [for bucket in local.flattened_iceberg_buckets["${var.gcp_dev_project_id}"] : bucket if can(regex("storage", bucket))][0]
+  iceberg_prod_catalog_bucket = [for bucket in local.flattened_iceberg_buckets["${var.gcp_prod_project_id}"] : bucket if can(regex("catalog", bucket))][0]
+  iceberg_prod_storage_bucket = [for bucket in local.flattened_iceberg_buckets["${var.gcp_prod_project_id}"] : bucket if can(regex("storage", bucket))][0]
   gcs_bucket_bindings = [
     {
-      bucket = local.iceberg_storage_bucket
+      bucket = local.iceberg_dev_storage_bucket
       role   = "roles/storage.objectViewer"
       members = [
-        "serviceAccount:${google_bigquery_connection.bigspark_connection.spark[0].service_account_id}"
+        "serviceAccount:${google_bigquery_connection.bigspark_connection[var.gcp_dev_project_id].spark[0].service_account_id}"
       ]
     },
     {
-      bucket = local.iceberg_catalog_bucket
+      bucket = local.iceberg_dev_catalog_bucket
       role   = "roles/storage.objectAdmin"
       members = [
-        "serviceAccount:${google_bigquery_connection.biglake_connection.cloud_resource[0].service_account_id}"
+        "serviceAccount:${google_bigquery_connection.biglake_connection[var.gcp_dev_project_id].cloud_resource[0].service_account_id}"
       ]
     },
     {
-      bucket = local.iceberg_storage_bucket
+      bucket = local.iceberg_dev_storage_bucket
       role   = "roles/storage.objectAdmin"
       members = [
-        "serviceAccount:${google_bigquery_connection.biglake_connection.cloud_resource[0].service_account_id}",
-        "serviceAccount:${google_bigquery_connection.bigspark_connection.spark[0].service_account_id}"
+        "serviceAccount:${google_bigquery_connection.biglake_connection[var.gcp_dev_project_id].cloud_resource[0].service_account_id}",
+        "serviceAccount:${google_bigquery_connection.bigspark_connection[var.gcp_dev_project_id].spark[0].service_account_id}"
+      ]
+    },
+    {
+      bucket = local.iceberg_prod_storage_bucket
+      role   = "roles/storage.objectViewer"
+      members = [
+        "serviceAccount:${google_bigquery_connection.bigspark_connection[var.gcp_prod_project_id].spark[0].service_account_id}"
+      ]
+    },
+    {
+      bucket = local.iceberg_prod_catalog_bucket
+      role   = "roles/storage.objectAdmin"
+      members = [
+        "serviceAccount:${google_bigquery_connection.biglake_connection[var.gcp_prod_project_id].cloud_resource[0].service_account_id}"
+      ]
+    },
+    {
+      bucket = local.iceberg_prod_storage_bucket
+      role   = "roles/storage.objectAdmin"
+      members = [
+        "serviceAccount:${google_bigquery_connection.biglake_connection[var.gcp_prod_project_id].cloud_resource[0].service_account_id}",
+        "serviceAccount:${google_bigquery_connection.bigspark_connection[var.gcp_prod_project_id].spark[0].service_account_id}"
       ]
     }
   ]
@@ -84,8 +108,8 @@ locals {
       dataset_id = "taxi_dataset"
       role       = "roles/bigquery.dataOwner"
       members = [
-        "serviceAccount:${google_bigquery_connection.bigspark_connection.spark[0].service_account_id}",
-        "serviceAccount:${google_bigquery_connection.biglake_connection.cloud_resource[0].service_account_id}",
+        "serviceAccount:${google_bigquery_connection.bigspark_connection[var.gcp_dev_project_id].spark[0].service_account_id}",
+        "serviceAccount:${google_bigquery_connection.biglake_connection[var.gcp_dev_project_id].cloud_resource[0].service_account_id}",
       ]
     }
   ]
@@ -103,15 +127,30 @@ locals {
       project = var.gcp_dev_project_id
       role    = "roles/biglake.admin"
       members = [
-        "serviceAccount:${google_bigquery_connection.bigspark_connection.spark[0].service_account_id}",
-        "serviceAccount:${google_bigquery_connection.biglake_connection.cloud_resource[0].service_account_id}",
+        "serviceAccount:${google_bigquery_connection.bigspark_connection[var.gcp_dev_project_id].spark[0].service_account_id}",
+        "serviceAccount:${google_bigquery_connection.biglake_connection[var.gcp_dev_project_id].cloud_resource[0].service_account_id}",
       ]
     },
     {
       project = var.gcp_dev_project_id
       role    = "roles/bigquery.user"
       members = [
-        "serviceAccount:${google_bigquery_connection.bigspark_connection.spark[0].service_account_id}",
+        "serviceAccount:${google_bigquery_connection.bigspark_connection[var.gcp_dev_project_id].spark[0].service_account_id}",
+      ]
+    },
+    {
+      project = var.gcp_prod_project_id
+      role    = "roles/biglake.admin"
+      members = [
+        "serviceAccount:${google_bigquery_connection.bigspark_connection[var.gcp_prod_project_id].spark[0].service_account_id}",
+        "serviceAccount:${google_bigquery_connection.biglake_connection[var.gcp_prod_project_id].cloud_resource[0].service_account_id}",
+      ]
+    },
+    {
+      project = var.gcp_prod_project_id
+      role    = "roles/bigquery.user"
+      members = [
+        "serviceAccount:${google_bigquery_connection.bigspark_connection[var.gcp_prod_project_id].spark[0].service_account_id}",
       ]
     }
   ]
@@ -237,14 +276,16 @@ resource "google_bigquery_dataset" "datasets" {
 
 # Only create for dev project for now
 resource "google_bigquery_connection" "bigspark_connection" {
-  project       = var.gcp_dev_project_id
+  for_each      = var.gcp_projects_info
+  project       = each.key
   connection_id = "bigspark-connection"
   location      = var.gcp_project_location
   spark {}
 }
 
 resource "google_bigquery_connection" "biglake_connection" {
-  project       = var.gcp_dev_project_id
+  for_each      = var.gcp_projects_info
+  project       = each.key
   connection_id = "biglake-connection"
   location      = var.gcp_project_location
   cloud_resource {}
